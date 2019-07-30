@@ -13,7 +13,7 @@ where
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
     let p = parse_ordered().or(parse_unordered());
-    many1(p).map(|workload| Workload { workload })
+    many1(p).map(|sections| Workload { sections })
 }
 
 fn parse_iter<I>() -> impl Parser<Input = I, Output = usize>

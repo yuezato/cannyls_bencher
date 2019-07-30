@@ -1,13 +1,15 @@
 extern crate cannyls;
+extern crate rand;
 pub use cannyls::lump::LumpId;
 
-mod parse;
+pub mod generator;
+pub mod parse;
 
 pub type Bytes = usize;
 pub type Perc = u8;
 pub type Freq = u8;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     // Put
     NewPut(Bytes),
@@ -39,7 +41,7 @@ pub enum SectionInner {
 
 #[derive(Debug, PartialEq)]
 pub struct Workload {
-    workload: Vec<Section>,
+    pub sections: Vec<Section>,
 }
 
 #[derive(Debug, PartialEq)]
