@@ -3,9 +3,17 @@ extern crate combine;
 use combine::error::ParseError;
 use combine::parser::char::{digit, spaces, string};
 use combine::parser::combinator::attempt;
-use combine::{many1, one_of, sep_end_by, token, Parser, Stream};
+use combine::{many1, one_of, optional, sep_end_by, token, Parser, Stream};
 
 use super::*;
+
+pub fn parse_seed<I>() -> impl Parser<Input = I, Output = u64>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    (string("Seed:").skip(spaces()), parse_num().skip(token(';'))).map(|(_, n)| n)
+}
 
 pub fn parse_workload<I>() -> impl Parser<Input = I, Output = Workload>
 where
@@ -13,7 +21,8 @@ where
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
     let p = parse_ordered().or(parse_unordered());
-    many1(p).map(|sections| Workload { sections })
+    (spaces().with(attempt(optional(parse_seed()))), many1(p))
+        .map(|(seed, sections)| Workload { seed, sections })
 }
 
 fn parse_iter<I>() -> impl Parser<Input = I, Output = usize>
@@ -436,9 +445,72 @@ Unordered[100] {
         };
 
         let w = Workload {
-            workload: vec![expected1, expected2],
+            seed: None,
+            sections: vec![expected1, expected2],
         };
 
         assert_eq!(parse_workload().parse(workload), Ok((w, "")));
+    }
+
+    #[test]
+    fn parse_workload_with_seed_works() {
+        let workload = r#"
+
+Seed: 42;
+
+
+Ordered[100] {
+  <10%> Get;
+  <20%> OverWrite(43);
+  <30%> Delete;
+  <39%> Delete(10, 20);
+  <1%> DeleteRange(99, 100);
+}
+
+Unordered[100] {
+  <10%> Get;
+  <20%> OverWrite(43);
+  <30%> Delete;
+  <39%> Delete(10, 20);
+  <1%> DeleteRange(99, 100);
+}
+"#;
+
+        let expected1 = Section {
+            iter: 100,
+            inner: SectionInner::Ordered(vec![
+                (10, Command::RandomGet),
+                (20, Command::Overwrite(43)),
+                (30, Command::RandomDelete),
+                (39, Command::Delete(10, 20)),
+                (1, Command::DeleteRange(99, 100)),
+            ]),
+        };
+
+        let expected2 = Section {
+            iter: 100,
+            inner: SectionInner::Unordered(vec![
+                (10, Command::RandomGet),
+                (20, Command::Overwrite(43)),
+                (30, Command::RandomDelete),
+                (39, Command::Delete(10, 20)),
+                (1, Command::DeleteRange(99, 100)),
+            ]),
+        };
+
+        let w = Workload {
+            seed: Some(42),
+            sections: vec![expected1, expected2],
+        };
+
+        assert_eq!(parse_workload().parse(workload), Ok((w, "")));
+    }
+
+    #[test]
+    fn parse_seed_work() {
+        assert_eq!(
+            parse_seed().parse("Seed: 1234567890;"),
+            Ok((1234567890, ""))
+        );
     }
 }

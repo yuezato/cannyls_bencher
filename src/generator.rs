@@ -1,14 +1,31 @@
 use super::{Bytes, RealCommand, Workload};
-use crate::rand::{Rng, SeedableRng};
-use crate::{Command, Freq, Section, SectionInner};
+use crate::rand::SeedableRng;
+use crate::{Command, Section, SectionInner};
 use cannyls::lump::LumpId;
-use std::ops::Range;
 
 pub struct State {
     rng: rand::rngs::StdRng,
     next: LumpId,
     live_ids: Vec<(LumpId, Bytes)>,
     pub commands: Vec<RealCommand>,
+}
+
+impl State {
+    pub fn new(seed: Option<u64>) -> State {
+        State {
+            rng: rand::rngs::StdRng::seed_from_u64(seed.unwrap_or(0)),
+            next: LumpId::new(1),
+            live_ids: Vec::new(),
+            commands: Vec::new(),
+        }
+    }
+}
+
+pub fn workload_to_real_commands(workload: &Workload) -> Vec<RealCommand> {
+    let mut state = State::new(workload.seed);
+    let commands = deal_workload(&mut state, workload);
+    commands_to_real_commands(&mut state, commands);
+    state.commands
 }
 
 pub fn commands_to_real_commands(state: &mut State, commands: Vec<Command>) {
@@ -34,11 +51,11 @@ pub fn default_state() -> State {
     }
 }
 
-pub fn deal_workload(state: &mut State, workload: Workload) -> Vec<Command> {
+pub fn deal_workload(state: &mut State, workload: &Workload) -> Vec<Command> {
     let mut commands: Vec<Command> = Vec::new();
 
-    for section in workload.sections {
-        commands.append(&mut section_to_commands(state, &section));
+    for section in &workload.sections {
+        commands.append(&mut section_to_commands(state, section));
     }
 
     commands

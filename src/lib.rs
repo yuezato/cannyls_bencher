@@ -41,6 +41,7 @@ pub enum SectionInner {
 
 #[derive(Debug, PartialEq)]
 pub struct Workload {
+    pub seed: Option<u64>,
     pub sections: Vec<Section>,
 }
 
