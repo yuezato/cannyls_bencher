@@ -11,11 +11,25 @@ struct Opt {
     #[structopt(long)]
     workload: PathBuf,
 
-    #[structopt(long)]
+    #[structopt(long, parse(try_from_str = "parse_with_suffix"))]
     capacity: u64,
 
     #[structopt(long)]
     lusfname: PathBuf,
+}
+
+fn parse_with_suffix(s: &str) -> Result<u64, String> {
+    use combine::parser::Parser;
+
+    if let Ok((num, rest)) = parse::parse_bytes_with_suffix().parse(s) {
+        if rest.is_empty() {
+            Ok(num as u64)
+        } else {
+            Err("Fail".to_owned())
+        }
+    } else {
+        Err("Fail".to_owned())
+    }
 }
 
 fn file_to_workload<P: AsRef<std::path::Path>>(filepath: P) -> Workload {

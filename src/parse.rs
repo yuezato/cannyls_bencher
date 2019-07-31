@@ -140,16 +140,17 @@ where
     many1(digit()).map(|string: String| string.parse::<U>().unwrap())
 }
 
-fn parse_bytes_with_suffix<I>() -> impl Parser<Input = I, Output = Bytes>
+pub fn parse_bytes_with_suffix<I>() -> impl Parser<Input = I, Output = Bytes>
 where
     I: Stream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
-    (many1(digit()), one_of("KM".chars())).map(|(string, suffix): (String, char)| {
+    (many1(digit()), one_of("KMG".chars())).map(|(string, suffix): (String, char)| {
         let num = string.parse::<usize>().unwrap();
         match suffix {
             'K' => num * 1024,
             'M' => num * 1024 * 1024,
+            'G' => num * 1024 * 1024 * 1024,
             _ => unreachable!("bug"),
         }
     })
