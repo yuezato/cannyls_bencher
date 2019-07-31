@@ -4,6 +4,7 @@ pub use cannyls::lump::LumpId;
 
 pub mod generator;
 pub mod parse;
+pub mod run_commands;
 
 pub type Bytes = usize;
 pub type Perc = u8;
@@ -27,19 +28,19 @@ pub enum Command {
     DeleteRange(Perc, Perc),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Section {
     pub inner: SectionInner,
     pub iter: usize,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SectionInner {
     Ordered(Vec<(Freq, Command)>),
     Unordered(Vec<(Freq, Command)>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Workload {
     pub seed: Option<u64>,
     pub sections: Vec<Section>,
