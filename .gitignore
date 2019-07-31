@@ -3,3 +3,6 @@
 
 # for emacs
 *~
+
+# ignore temporary lusf files
+*.lusf

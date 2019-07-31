@@ -11,7 +11,6 @@ struct Opt {
     #[structopt(long)]
     workload: PathBuf,
 
-    ///
     #[structopt(long)]
     capacity: u64,
 
