@@ -1,11 +1,19 @@
 extern crate combine;
 
+use combine::combinator::{attempt, skip_until};
 use combine::error::ParseError;
 use combine::parser::char::{digit, spaces, string};
-use combine::parser::combinator::attempt;
-use combine::{many1, one_of, optional, sep_end_by, token, Parser, Stream};
+use combine::{eof, many1, one_of, optional, sep_by, sep_end_by, token, Parser, Stream};
 
 use super::*;
+
+pub fn parse_line_comment<I>() -> impl Parser<Input = I, Output = ()>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    token('#').with(skip_until((token('\n').map(|_| ())).or(eof())))
+}
 
 pub fn parse_seed<I>() -> impl Parser<Input = I, Output = u64>
 where
@@ -20,8 +28,10 @@ where
     I: Stream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
-    let p = parse_ordered().or(parse_unordered());
-    (spaces().with(attempt(optional(parse_seed()))), many1(p))
+    (
+        spaces().with(attempt(optional(parse_seed()))),
+        many1(parse_section()),
+    )
         .map(|(seed, sections)| Workload { seed, sections })
 }
 
@@ -31,6 +41,24 @@ where
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
     (token('['), parse_num(), token(']')).map(|(_, iter, _)| iter)
+}
+
+pub fn spaces_with_comments<I>() -> impl Parser<Input = I, Output = ()>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    sep_by(spaces(), parse_line_comment())
+}
+
+fn parse_section<I>() -> impl Parser<Input = I, Output = Section>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    spaces_with_comments()
+        .with(parse_ordered().or(parse_unordered()))
+        .skip(spaces_with_comments())
 }
 
 fn parse_ordered<I>() -> impl Parser<Input = I, Output = Section>
@@ -507,10 +535,81 @@ Unordered[100] {
     }
 
     #[test]
-    fn parse_seed_work() {
+    fn parse_seed_works() {
         assert_eq!(
             parse_seed().parse("Seed: 1234567890;"),
             Ok((1234567890, ""))
         );
+    }
+
+    #[test]
+    fn parse_line_comment_works() {
+        assert_eq!(
+            parse_line_comment().parse("# line comment   test"),
+            Ok(((), ""))
+        );
+        assert_eq!(
+            parse_line_comment().parse(
+                r#"# line comment   test
+"#
+            ),
+            Ok(((), "\n"))
+        );
+        assert_eq!(parse_line_comment().parse("# comment    "), Ok(((), "")));
+    }
+
+    #[test]
+    fn spaces_with_comments_works() {
+        assert_eq!(
+            spaces_with_comments().parse("   #comment1   "),
+            Ok(((), ""))
+        );
+
+        assert_eq!(
+            spaces_with_comments().parse(
+                r#"
+
+#comment1
+
+# comment2
+
+    # comment3
+
+"#
+            ),
+            Ok(((), ""))
+        );
+    }
+
+    #[test]
+    fn parse_section_works() {
+        let syntax = r#"
+# Comment for the following section:
+# Iteration 100
+# 10-times Get
+# 20-times 43bytes New Put
+# ...
+Ordered[100] {
+  <10%> Get;
+  <20%> New(43);
+  <30%> Delete;
+  <39%> Delete(10, 20);
+  <1%> DeleteRange(99, 100);
+}
+"#;
+        let expected = Section {
+            iter: 100,
+            inner: SectionInner::Ordered(vec![
+                (10, Command::RandomGet),
+                (20, Command::NewPut(43)),
+                (30, Command::RandomDelete),
+                (39, Command::Delete(10, 20)),
+                (1, Command::DeleteRange(99, 100)),
+            ]),
+        };
+
+        let r = parse_section().easy_parse(syntax);
+
+        assert_eq!(r, Ok((expected, "")));
     }
 }
