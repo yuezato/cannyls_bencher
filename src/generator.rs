@@ -97,6 +97,7 @@ fn overwrite(state: &mut State, bytes: Bytes) {
     }
     let z = choose(&mut state.rng, 0, state.live_ids.len() - 1);
     let lumpid = state.live_ids[z].0;
+    state.live_ids[z].1 = bytes;
     state.commands.push(RealCommand::Put(lumpid, bytes));
 }
 

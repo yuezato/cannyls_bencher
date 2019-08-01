@@ -1,0 +1,11 @@
+Ordered[20000] {
+  <40%> New(500K);
+  <30%> New(1M);
+  <30%> New(2M);
+}
+
+Unordered[10000] {
+  <30%> OverWrite(500K);
+  <30%> Get;
+  <40%> Delete;
+}
