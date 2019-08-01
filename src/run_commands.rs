@@ -1,4 +1,5 @@
 use crate::{Bytes, RealCommand};
+use cannyls::lump;
 use cannyls::nvm::{FileNvm, NonVolatileMemory};
 use cannyls::storage::{Storage, StorageBuilder};
 use std::collections::BTreeMap;
@@ -34,10 +35,11 @@ pub fn statistics(h: &mut History) {
 
         let p50 = percentile(v, 50);
         let p90 = percentile(v, 90);
+        let p95 = percentile(v, 95);
         let p99 = percentile(v, 99);
         println!(
-            "kind = {:?}, 50% = {:?}, 90% = {:?}, 99% = {:?}",
-            kind, p50, p90, p99
+            "kind = {:?}, 50% = {:?}, 90% = {:?}, 95% = {:?}, 99% = {:?}",
+            kind, p50, p90, p95, p99
         );
 
         overall.append(v);
@@ -48,12 +50,14 @@ pub fn statistics(h: &mut History) {
 
         let p50 = percentile(&overall, 50);
         let p90 = percentile(&overall, 90);
+        let p95 = percentile(&overall, 95);
         let p99 = percentile(&overall, 99);
         println!(
-            "[Overall {}] 50% = {:?}, 90% = {:?}, 99% = {:?}",
+            "[Overall {}] 50% = {:?}, 90% = {:?}, 95% = {:?}, 99% = {:?}",
             overall.len(),
             p50,
             p90,
+            p95,
             p99
         );
     }
@@ -93,8 +97,21 @@ where
         }
         RealCommand::Get(lumpid, bytes) => {
             let now = Instant::now();
-            let _ = storage.get(&lumpid).unwrap();
+            let lump = storage.get(&lumpid).unwrap();
             let elapsed = now.elapsed();
+
+            assert!(lump.is_some());
+
+            let lump: lump::LumpData = lump.unwrap();
+
+            if lump.as_bytes().len() != *bytes {
+                panic!(
+                    "GET Error[Lumpid = {}]: size = {}, expected size = {}",
+                    lumpid,
+                    lump.as_bytes().len(),
+                    bytes
+                );
+            }
 
             if let Some(v) = history.0.get_mut(&CommandKind::Get(*bytes)) {
                 v.push(elapsed);
@@ -104,8 +121,12 @@ where
         }
         RealCommand::Delete(lumpid) => {
             let now = Instant::now();
-            let _ = storage.delete(&lumpid).unwrap();
+            let existed = storage.delete(&lumpid).unwrap();
             let elapsed = now.elapsed();
+
+            if !existed {
+                panic!("Delete Error: Lumpid = {} does not exist", lumpid);
+            }
 
             if let Some(v) = history.0.get_mut(&CommandKind::Delete) {
                 v.push(elapsed);
