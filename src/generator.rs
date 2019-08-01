@@ -108,8 +108,8 @@ fn get(state: &mut State, left: u8, right: u8) {
     let x = (l * left as usize) / 100;
     let y = (l * right as usize) / 100;
     let z = choose(&mut state.rng, x, y);
-    let lumpid = state.live_ids[z].0;
-    state.commands.push(RealCommand::Get(lumpid));
+    let (lumpid, bytes) = state.live_ids[z];
+    state.commands.push(RealCommand::Get(lumpid, bytes));
 }
 
 fn delete(state: &mut State, left: u8, right: u8) {

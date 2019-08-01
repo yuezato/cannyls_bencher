@@ -5,18 +5,59 @@ use std::collections::BTreeMap;
 use std::ops::Range;
 use std::time::{Duration, Instant};
 
-#[derive(PartialOrd, PartialEq, Eq, Ord)]
+#[derive(Debug, PartialOrd, PartialEq, Eq, Ord)]
 enum CommandKind {
     Put(Bytes),
 
     Get(Bytes),
 
-    Delete(Bytes),
+    Delete,
 
     DeleteRange,
 }
 
 pub struct History(BTreeMap<CommandKind, Vec<Duration>>);
+
+fn percentile(v: &[Duration], p: u8) -> Duration {
+    // assert!(v.is_sorted());
+    assert!(p <= 100);
+
+    let pos: usize = (p as usize * v.len()) / 100;
+    v[pos.saturating_sub(1)]
+}
+
+pub fn statistics(h: &mut History) {
+    let mut overall = Vec::new();
+
+    for (kind, v) in &mut h.0 {
+        v.sort();
+
+        let p50 = percentile(v, 50);
+        let p90 = percentile(v, 90);
+        let p99 = percentile(v, 99);
+        println!(
+            "kind = {:?}, 50% = {:?}, 90% = {:?}, 99% = {:?}",
+            kind, p50, p90, p99
+        );
+
+        overall.append(v);
+    }
+
+    {
+        overall.sort();
+
+        let p50 = percentile(&overall, 50);
+        let p90 = percentile(&overall, 90);
+        let p99 = percentile(&overall, 99);
+        println!(
+            "[Overall {}] 50% = {:?}, 90% = {:?}, 99% = {:?}",
+            overall.len(),
+            p50,
+            p90,
+            p99
+        );
+    }
+}
 
 pub fn do_commands<N>(storage: &mut Storage<N>, commands: &[RealCommand]) -> History
 where
@@ -50,19 +91,43 @@ where
                 }
             }
         }
-        RealCommand::Get(lumpid) => {
+        RealCommand::Get(lumpid, bytes) => {
+            let now = Instant::now();
             let _ = storage.get(&lumpid).unwrap();
+            let elapsed = now.elapsed();
+
+            if let Some(v) = history.0.get_mut(&CommandKind::Get(*bytes)) {
+                v.push(elapsed);
+            } else {
+                history.0.insert(CommandKind::Get(*bytes), vec![elapsed]);
+            }
         }
         RealCommand::Delete(lumpid) => {
+            let now = Instant::now();
             let _ = storage.delete(&lumpid).unwrap();
+            let elapsed = now.elapsed();
+
+            if let Some(v) = history.0.get_mut(&CommandKind::Delete) {
+                v.push(elapsed);
+            } else {
+                history.0.insert(CommandKind::Delete, vec![elapsed]);
+            }
         }
         RealCommand::DeleteRange(start, end) => {
+            let now = Instant::now();
             let _ = storage
                 .delete_range(Range {
                     start: *start,
                     end: *end,
                 })
                 .unwrap();
+            let elapsed = now.elapsed();
+
+            if let Some(v) = history.0.get_mut(&CommandKind::DeleteRange) {
+                v.push(elapsed);
+            } else {
+                history.0.insert(CommandKind::DeleteRange, vec![elapsed]);
+            }
         }
     }
 }

@@ -1,5 +1,4 @@
-Unordered[100] {
-  <30%> Get;
-  <60%> New(5K);
-  <10%> Delete;
+Ordered[10000] {
+  <80%> New(500K);
+  <20%> Get;
 }

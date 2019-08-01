@@ -52,7 +52,7 @@ pub enum RealCommand {
     Put(LumpId, Bytes),
 
     // Get
-    Get(LumpId),
+    Get(LumpId, Bytes),
 
     // Delete
     Delete(LumpId),
