@@ -9,7 +9,7 @@ Seed: 42;
 # 上から順番に実行
 Ordered[100] {
   <10%> Get;
-  <20%> OverWrite(43);
+  <20%> New(43);
   <30%> Delete;
   <39%> Delete(10, 20);
   <1%> DeleteRange(99, 100);
@@ -19,7 +19,7 @@ Ordered[100] {
 # 順不同実行
 Unordered[200] {
   <10%> Get;
-  <20%> OverWrite(43);
+  <20%> New(43);
   <30%> Delete;
   <39%> Delete(10, 20);
   <1%> DeleteRange(99, 100);
