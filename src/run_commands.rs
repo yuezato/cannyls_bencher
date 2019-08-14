@@ -17,7 +17,19 @@ enum CommandKind {
     DeleteRange,
 }
 
-pub struct History(BTreeMap<CommandKind, Vec<Duration>>);
+pub struct Summary {
+    result: BTreeMap<CommandKind, Vec<Duration>>,
+    total_time: Duration,
+}
+
+impl Default for Summary {
+    fn default() -> Summary {
+        Summary {
+            result: BTreeMap::new(),
+            total_time: Duration::new(0, 0),
+        }
+    }
+}
 
 fn percentile(v: &[Duration], p: u8) -> Duration {
     // assert!(v.is_sorted());
@@ -27,10 +39,10 @@ fn percentile(v: &[Duration], p: u8) -> Duration {
     v[pos.saturating_sub(1)]
 }
 
-pub fn statistics(h: &mut History) {
+pub fn statistics(s: &mut Summary) {
     let mut overall = Vec::new();
 
-    for (kind, v) in &mut h.0 {
+    for (kind, v) in &mut s.result {
         v.sort();
 
         let p50 = percentile(v, 50);
@@ -38,8 +50,13 @@ pub fn statistics(h: &mut History) {
         let p95 = percentile(v, 95);
         let p99 = percentile(v, 99);
         println!(
-            "kind = {:?}, 50% = {:?}, 90% = {:?}, 95% = {:?}, 99% = {:?}",
-            kind, p50, p90, p95, p99
+            "kind = {:?}, count = {}, 50% = {:?}, 90% = {:?}, 95% = {:?}, 99% = {:?}",
+            kind,
+            v.len(),
+            p50,
+            p90,
+            p95,
+            p99
         );
 
         overall.append(v);
@@ -53,30 +70,31 @@ pub fn statistics(h: &mut History) {
         let p95 = percentile(&overall, 95);
         let p99 = percentile(&overall, 99);
         println!(
-            "[Overall {}] 50% = {:?}, 90% = {:?}, 95% = {:?}, 99% = {:?}",
+            "[Overall {}] 50% = {:?}, 90% = {:?}, 95% = {:?}, 99% = {:?}\nTotal Elapsed = {:?}",
             overall.len(),
             p50,
             p90,
             p95,
-            p99
+            p99,
+            s.total_time,
         );
     }
 }
 
-pub fn do_commands<N>(storage: &mut Storage<N>, commands: &[RealCommand]) -> History
+pub fn do_commands<N>(storage: &mut Storage<N>, commands: &[RealCommand]) -> Summary
 where
     N: NonVolatileMemory,
 {
-    let mut history: History = History(BTreeMap::new());
+    let mut summary: Summary = Default::default();
 
     for command in commands {
-        do_command(storage, command, &mut history)
+        do_command(storage, command, &mut summary)
     }
 
-    history
+    summary
 }
 
-pub fn do_command<N>(storage: &mut Storage<N>, command: &RealCommand, history: &mut History)
+pub fn do_command<N>(storage: &mut Storage<N>, command: &RealCommand, summary: &mut Summary)
 where
     N: NonVolatileMemory,
 {
@@ -88,10 +106,14 @@ where
                 let _ = storage.put(&lumpid, &lump).unwrap();
                 let elapsed = now.elapsed();
 
-                if let Some(v) = history.0.get_mut(&CommandKind::Put(*bytes)) {
+                summary.total_time += elapsed;
+
+                if let Some(v) = summary.result.get_mut(&CommandKind::Put(*bytes)) {
                     v.push(elapsed);
                 } else {
-                    history.0.insert(CommandKind::Put(*bytes), vec![elapsed]);
+                    summary
+                        .result
+                        .insert(CommandKind::Put(*bytes), vec![elapsed]);
                 }
             }
         }
@@ -99,6 +121,8 @@ where
             let now = Instant::now();
             let lump = storage.get(&lumpid).unwrap();
             let elapsed = now.elapsed();
+
+            summary.total_time += elapsed;
 
             assert!(lump.is_some());
 
@@ -113,10 +137,12 @@ where
                 );
             }
 
-            if let Some(v) = history.0.get_mut(&CommandKind::Get(*bytes)) {
+            if let Some(v) = summary.result.get_mut(&CommandKind::Get(*bytes)) {
                 v.push(elapsed);
             } else {
-                history.0.insert(CommandKind::Get(*bytes), vec![elapsed]);
+                summary
+                    .result
+                    .insert(CommandKind::Get(*bytes), vec![elapsed]);
             }
         }
         RealCommand::Delete(lumpid) => {
@@ -124,14 +150,16 @@ where
             let existed = storage.delete(&lumpid).unwrap();
             let elapsed = now.elapsed();
 
+            summary.total_time += elapsed;
+
             if !existed {
                 panic!("Delete Error: Lumpid = {} does not exist", lumpid);
             }
 
-            if let Some(v) = history.0.get_mut(&CommandKind::Delete) {
+            if let Some(v) = summary.result.get_mut(&CommandKind::Delete) {
                 v.push(elapsed);
             } else {
-                history.0.insert(CommandKind::Delete, vec![elapsed]);
+                summary.result.insert(CommandKind::Delete, vec![elapsed]);
             }
         }
         RealCommand::DeleteRange(start, end) => {
@@ -144,10 +172,14 @@ where
                 .unwrap();
             let elapsed = now.elapsed();
 
-            if let Some(v) = history.0.get_mut(&CommandKind::DeleteRange) {
+            summary.total_time += elapsed;
+
+            if let Some(v) = summary.result.get_mut(&CommandKind::DeleteRange) {
                 v.push(elapsed);
             } else {
-                history.0.insert(CommandKind::DeleteRange, vec![elapsed]);
+                summary
+                    .result
+                    .insert(CommandKind::DeleteRange, vec![elapsed]);
             }
         }
     }

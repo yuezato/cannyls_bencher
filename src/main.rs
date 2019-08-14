@@ -51,8 +51,6 @@ fn main() {
     let w = file_to_workload(opt.workload);
     let commands = generator::workload_to_real_commands(&w);
 
-    // println!("{:?}", commands);
-
     let mut storage = run_commands::make_storage_on_file(opt.lusfname, opt.capacity);
     let mut history = run_commands::do_commands(&mut storage, &commands);
     run_commands::statistics(&mut history);
