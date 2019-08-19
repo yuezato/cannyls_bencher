@@ -1,6 +1,13 @@
 extern crate cannyls_bencher;
+extern crate fibers_global;
+extern crate fibers_http_server;
+extern crate futures;
 use cannyls_bencher::generator;
 use cannyls_bencher::*;
+use futures::{lazy, Future};
+
+use fibers_http_server::metrics::{MetricsHandler, WithMetrics};
+use fibers_http_server::ServerBuilder;
 
 use chrono::Local;
 use std::path::PathBuf;
@@ -46,18 +53,39 @@ fn file_to_workload<P: AsRef<std::path::Path>>(filepath: P) -> Workload {
 }
 
 fn main() {
+    let addr = "0.0.0.0:5555".parse().unwrap();
+    let mut builder = ServerBuilder::new(addr);
+    builder
+        .add_handler(WithMetrics::new(MetricsHandler))
+        .unwrap();
+
+    let server = builder.finish(fibers_global::handle());
+    fibers_global::spawn(server.map_err(|_| ()));
+
     let opt = Opt::from_args();
+    let capacity = opt.capacity;
+    let lusfname = opt.lusfname.clone();
     println!("{:#?}", opt);
 
     let w = file_to_workload(opt.workload);
-    let commands = generator::workload_to_real_commands(&w);
 
-    let mut storage = run_commands::make_storage_on_file(opt.lusfname, opt.capacity);
+    fibers_global::execute(
+        lazy(move || {
+            let commands = generator::workload_to_real_commands(&w);
 
-    println!("Start Benchmark @ {}", Local::now());
-    let mut summary = run_commands::do_commands(&mut storage, &commands);
-    println!("Finish Benchmark @ {}", Local::now());
+            let mut storage = run_commands::make_storage_on_file(lusfname, capacity);
 
-    println!("Calculating Statistics...");
-    run_commands::statistics(&mut summary);
+            println!("Start Benchmark @ {}", Local::now());
+            let mut summary = run_commands::do_commands(&mut storage, &commands);
+            println!("Finish Benchmark @ {}", Local::now());
+
+            println!("Calculating Statistics...");
+            run_commands::statistics(&mut summary);
+
+            Ok(())
+        })
+        .map(|_| ())
+        .map_err(|_: ()| ()),
+    )
+    .unwrap();
 }
