@@ -2,6 +2,7 @@ extern crate cannyls_bencher;
 use cannyls_bencher::generator;
 use cannyls_bencher::*;
 
+use chrono::Local;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -52,6 +53,11 @@ fn main() {
     let commands = generator::workload_to_real_commands(&w);
 
     let mut storage = run_commands::make_storage_on_file(opt.lusfname, opt.capacity);
-    let mut history = run_commands::do_commands(&mut storage, &commands);
-    run_commands::statistics(&mut history);
+
+    println!("Start Benchmark @ {}", Local::now());
+    let mut summary = run_commands::do_commands(&mut storage, &commands);
+    println!("Finish Benchmark @ {}", Local::now());
+
+    println!("Calculating Statistics...");
+    run_commands::statistics(&mut summary);
 }

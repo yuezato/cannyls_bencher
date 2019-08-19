@@ -70,14 +70,14 @@ pub fn statistics(s: &mut Summary) {
         let p95 = percentile(&overall, 95);
         let p99 = percentile(&overall, 99);
         println!(
-            "[Overall {}] 50% = {:?}, 90% = {:?}, 95% = {:?}, 99% = {:?}\nTotal Elapsed = {:?}",
+            "[Overall {}] 50% = {:?}, 90% = {:?}, 95% = {:?}, 99% = {:?}",
             overall.len(),
             p50,
             p90,
             p95,
             p99,
-            s.total_time,
         );
+        println!("Total Elapsed Time by Commands = {:?}", s.total_time);
     }
 }
 
