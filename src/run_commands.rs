@@ -185,11 +185,18 @@ where
     }
 }
 
-pub fn make_storage_on_file<P>(filepath: P, capacity: u64) -> Storage<FileNvm>
+pub fn make_storage_on_file<P>(
+    filepath: P,
+    capacity: u64,
+    safe_release_mode: bool,
+) -> Storage<FileNvm>
 where
     P: AsRef<std::path::Path>,
 {
     let filenvm = FileNvm::create(filepath, capacity).unwrap();
-    let builder = StorageBuilder::new();
+    let mut builder = StorageBuilder::new();
+    if safe_release_mode {
+        builder.enable_safe_release_mode();
+    }
     builder.create(filenvm).unwrap()
 }

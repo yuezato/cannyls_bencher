@@ -27,6 +27,9 @@ struct Opt {
 
     #[structopt(long)]
     verbose: bool,
+
+    #[structopt(long)]
+    safe_release: bool,
 }
 
 fn parse_with_suffix(s: &str) -> Result<u64, String> {
@@ -68,6 +71,7 @@ fn main() {
     let opt = Opt::from_args();
     let capacity = opt.capacity;
     let lusfname = opt.lusfname.clone();
+    let safe_release_mode = opt.safe_release;
     println!("{:#?}", opt);
 
     let w = file_to_workload(opt.workload);
@@ -82,7 +86,8 @@ fn main() {
             let commands = generator::workload_to_real_commands(&w);
             println!("Finish Generating Commands @ {}", Local::now());
 
-            let mut storage = run_commands::make_storage_on_file(lusfname, capacity);
+            let mut storage =
+                run_commands::make_storage_on_file(lusfname, capacity, safe_release_mode);
 
             println!("Start Benchmark @ {}", Local::now());
             let mut summary = run_commands::do_commands(&mut storage, &commands);
