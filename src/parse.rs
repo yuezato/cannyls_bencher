@@ -70,7 +70,7 @@ where
         spaces().with(string("Ordered")),
         parse_iter(),
         spaces().with(token('{')).skip(spaces()),
-        sep_end_by(parse_freq_command(), spaces()),
+        sep_end_by(parse_freq_statement(), spaces()),
         token('}').skip(spaces()),
     )
         .map(|(_, iter, _, commands, _)| Section {
@@ -88,13 +88,36 @@ where
         spaces().with(string("Unordered")),
         parse_iter(),
         spaces().with(token('{')).skip(spaces()),
-        sep_end_by(parse_freq_command(), spaces()),
+        sep_end_by(parse_freq_statement(), spaces()),
         token('}').skip(spaces()),
     )
         .map(|(_, iter, _, commands, _)| Section {
             iter,
             inner: SectionInner::Unordered(commands),
         })
+}
+
+fn parse_freq_statement<I>() -> impl Parser<Input = I, Output = (Freq, Statement)>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    attempt(parse_freq_command().map(|(freq, command)| (freq, Statement(vec![command]))))
+        .or(parse_freq_statement_with_braces())
+}
+
+fn parse_freq_statement_with_braces<I>() -> impl Parser<Input = I, Output = (Freq, Statement)>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    (
+        spaces().with(parse_freq()).skip(spaces()),
+        spaces().with(token('{')).skip(spaces()),
+        sep_end_by(parse_command().skip(token(';')), spaces()),
+        token('}').skip(spaces()).skip(token(';')),
+    )
+        .map(|(freq, _, commands, _)| (freq, Statement(commands)))
 }
 
 fn parse_freq_command<I>() -> impl Parser<Input = I, Output = (Freq, Command)>

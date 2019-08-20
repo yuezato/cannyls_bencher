@@ -24,6 +24,9 @@ struct Opt {
 
     #[structopt(long)]
     lusfname: PathBuf,
+
+    #[structopt(long)]
+    verbose: bool,
 }
 
 fn parse_with_suffix(s: &str) -> Result<u64, String> {
@@ -69,9 +72,15 @@ fn main() {
 
     let w = file_to_workload(opt.workload);
 
+    if opt.verbose {
+        println!("{:?}", w);
+    }
+
     fibers_global::execute(
         lazy(move || {
+            println!("Start Generating Commands @ {}", Local::now());
             let commands = generator::workload_to_real_commands(&w);
+            println!("Finish Generating Commands @ {}", Local::now());
 
             let mut storage = run_commands::make_storage_on_file(lusfname, capacity);
 
