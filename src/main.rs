@@ -60,7 +60,7 @@ fn main() {
         .unwrap();
 
     let server = builder.finish(fibers_global::handle());
-    fibers_global::spawn(server.map_err(|_| ()));
+    fibers_global::spawn(server.map_err(|e| panic!("Metrics Server Error: {:?}", e)));
 
     let opt = Opt::from_args();
     let capacity = opt.capacity;
