@@ -29,6 +29,9 @@ pub enum Command {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Statement(Vec<Command>);
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Section {
     pub inner: SectionInner,
     pub iter: usize,
@@ -36,8 +39,8 @@ pub struct Section {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SectionInner {
-    Ordered(Vec<(Freq, Command)>),
-    Unordered(Vec<(Freq, Command)>),
+    Ordered(Vec<(Freq, Statement)>),
+    Unordered(Vec<(Freq, Statement)>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
