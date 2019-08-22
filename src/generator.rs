@@ -1,6 +1,6 @@
 use super::{Bytes, RealCommand, Workload};
 use crate::rand::SeedableRng;
-use crate::{Command, Section, SectionInner, Statement};
+use crate::{Command, Section, Statement};
 use cannyls::lump::LumpId;
 
 pub struct State {
@@ -38,6 +38,13 @@ pub fn commands_to_real_commands(state: &mut State, commands: Vec<Command>) {
             Command::RandomDelete => delete(state, 0, 100),
             Command::Delete(left, right) => delete(state, left, right),
             Command::DeleteRange(left, right) => delete_range(state, left, right),
+            Command::Times(count, commands) => {
+                let commands = vec![commands; count]
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>();
+                commands_to_real_commands(state, commands)
+            }
         }
     }
 }
@@ -64,20 +71,25 @@ pub fn deal_workload(state: &mut State, workload: &Workload) -> Vec<Command> {
 fn section_to_commands(state: &mut State, section: &Section) -> Vec<Command> {
     use rand::seq::SliceRandom;
 
-    let v = match &section.inner {
-        SectionInner::Ordered(v) => v,
-        SectionInner::Unordered(v) => v,
+    if let Section::Commands(commands) = section {
+        return commands.clone();
+    }
+
+    let (iter, v) = match &section {
+        Section::Ordered(iter, v) => (iter, v),
+        Section::Unordered(iter, v) => (iter, v),
+        _ => panic!("error"),
     };
 
     let mut statements: Vec<Statement> = Vec::new();
     let mut commands: Vec<Command> = Vec::new();
 
     for (freq, statement) in v {
-        let y = (section.iter * *freq as usize) / 100;
+        let y = (iter * *freq as usize) / 100;
         statements.append(&mut vec![statement.clone(); y]);
     }
 
-    if let SectionInner::Unordered(_) = section.inner {
+    if let Section::Unordered(_, _) = section {
         statements.shuffle(&mut state.rng);
     }
 

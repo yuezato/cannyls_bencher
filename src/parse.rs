@@ -1,9 +1,7 @@
-extern crate combine;
-
 use combine::combinator::{attempt, skip_until};
 use combine::error::ParseError;
 use combine::parser::char::{digit, spaces, string};
-use combine::{eof, many1, one_of, optional, sep_by, sep_end_by, token, Parser, Stream};
+use combine::{eof, many1, one_of, optional, parser, sep_by, sep_end_by, token, Parser, Stream};
 
 use super::*;
 
@@ -57,8 +55,49 @@ where
     I::Error: ParseError<I::Item, I::Range, I::Position>,
 {
     spaces_with_comments()
-        .with(parse_ordered().or(parse_unordered()))
+        .with(
+            parse_ordered()
+                .or(parse_unordered())
+                .or(parse_top_command()),
+        )
         .skip(spaces_with_comments())
+}
+
+/*
+  10.times {
+    command;
+    command;
+  }
+*/
+fn parse_times<I>() -> impl Parser<Input = I, Output = Command>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    (
+        spaces().with(parse_num()).skip(string(".times")),
+        spaces().with(string("{")).skip(spaces()),
+        sep_end_by(parse_command().skip(token(';')), spaces()),
+        spaces().with(string("}")).skip(spaces()),
+    )
+        .map(|(iter, _, commands, _)| Command::Times(iter, commands))
+}
+
+fn parse_top_command<I>() -> impl Parser<Input = I, Output = Section>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    (
+        spaces()
+            .with(string("Command"))
+            .skip(spaces())
+            .skip(token('{'))
+            .skip(spaces()),
+        sep_end_by(parse_command().skip(token(';')), spaces()),
+        token('}').skip(spaces()),
+    )
+        .map(|(_, commands, _)| Section::Commands(commands))
 }
 
 fn parse_ordered<I>() -> impl Parser<Input = I, Output = Section>
@@ -73,10 +112,7 @@ where
         sep_end_by(parse_freq_statement(), spaces()),
         token('}').skip(spaces()),
     )
-        .map(|(_, iter, _, commands, _)| Section {
-            iter,
-            inner: SectionInner::Ordered(commands),
-        })
+        .map(|(_, iter, _, commands, _)| Section::Ordered(iter, commands))
 }
 
 fn parse_unordered<I>() -> impl Parser<Input = I, Output = Section>
@@ -91,10 +127,7 @@ where
         sep_end_by(parse_freq_statement(), spaces()),
         token('}').skip(spaces()),
     )
-        .map(|(_, iter, _, commands, _)| Section {
-            iter,
-            inner: SectionInner::Unordered(commands),
-        })
+        .map(|(_, iter, _, commands, _)| Section::Unordered(iter, commands))
 }
 
 fn parse_freq_statement<I>() -> impl Parser<Input = I, Output = (Freq, Statement)>
@@ -131,7 +164,7 @@ where
     )
 }
 
-fn parse_command<I>() -> impl Parser<Input = I, Output = Command>
+fn parse_command_<I>() -> impl Parser<Input = I, Output = Command>
 where
     I: Stream<Item = char>,
     I::Error: ParseError<I::Item, I::Range, I::Position>,
@@ -143,6 +176,14 @@ where
         .or(attempt(delete_with_perc()))
         .or(attempt(delete_range()))
         .or(random_delete())
+        .or(attempt(parse_times()))
+}
+parser! {
+    fn parse_command[I]()(I) -> Command
+    where [I: Stream<Item = char>]
+    {
+        parse_command_()
+    }
 }
 
 fn parse_freq<I>() -> impl Parser<Input = I, Output = Freq>
@@ -397,6 +438,10 @@ mod tests {
         );
     }
 
+    fn to_stmt(c: Command) -> Statement {
+        Statement(vec![c])
+    }
+
     #[test]
     fn parse_ordered_works() {
         let syntax = r#"
@@ -408,16 +453,16 @@ Ordered[100] {
   <1%> DeleteRange(99, 100);
 }
 "#;
-        let expected = Section {
-            iter: 100,
-            inner: SectionInner::Ordered(vec![
-                (10, Command::RandomGet),
-                (20, Command::Overwrite(43)),
-                (30, Command::RandomDelete),
-                (39, Command::Delete(10, 20)),
-                (1, Command::DeleteRange(99, 100)),
-            ]),
-        };
+        let expected = Section::Ordered(
+            100,
+            vec![
+                (10, to_stmt(Command::RandomGet)),
+                (20, to_stmt(Command::Overwrite(43))),
+                (30, to_stmt(Command::RandomDelete)),
+                (39, to_stmt(Command::Delete(10, 20))),
+                (1, to_stmt(Command::DeleteRange(99, 100))),
+            ],
+        );
 
         assert_eq!(parse_ordered().parse(syntax), Ok((expected, "")));
     }
@@ -433,16 +478,16 @@ Unordered[100] {
   <1%> DeleteRange(99, 100);
 }
 "#;
-        let expected = Section {
-            iter: 100,
-            inner: SectionInner::Unordered(vec![
-                (10, Command::RandomGet),
-                (20, Command::Overwrite(43)),
-                (30, Command::RandomDelete),
-                (39, Command::Delete(10, 20)),
-                (1, Command::DeleteRange(99, 100)),
-            ]),
-        };
+        let expected = Section::Unordered(
+            100,
+            vec![
+                (10, to_stmt(Command::RandomGet)),
+                (20, to_stmt(Command::Overwrite(43))),
+                (30, to_stmt(Command::RandomDelete)),
+                (39, to_stmt(Command::Delete(10, 20))),
+                (1, to_stmt(Command::DeleteRange(99, 100))),
+            ],
+        );
 
         assert_eq!(parse_unordered().parse(syntax), Ok((expected, "")));
     }
@@ -474,27 +519,27 @@ Unordered[100] {
 }
 "#;
 
-        let expected1 = Section {
-            iter: 100,
-            inner: SectionInner::Ordered(vec![
-                (10, Command::RandomGet),
-                (20, Command::Overwrite(43)),
-                (30, Command::RandomDelete),
-                (39, Command::Delete(10, 20)),
-                (1, Command::DeleteRange(99, 100)),
-            ]),
-        };
+        let expected1 = Section::Ordered(
+            100,
+            vec![
+                (10, to_stmt(Command::RandomGet)),
+                (20, to_stmt(Command::Overwrite(43))),
+                (30, to_stmt(Command::RandomDelete)),
+                (39, to_stmt(Command::Delete(10, 20))),
+                (1, to_stmt(Command::DeleteRange(99, 100))),
+            ],
+        );
 
-        let expected2 = Section {
-            iter: 100,
-            inner: SectionInner::Unordered(vec![
-                (10, Command::RandomGet),
-                (20, Command::Overwrite(43)),
-                (30, Command::RandomDelete),
-                (39, Command::Delete(10, 20)),
-                (1, Command::DeleteRange(99, 100)),
-            ]),
-        };
+        let expected2 = Section::Unordered(
+            100,
+            vec![
+                (10, to_stmt(Command::RandomGet)),
+                (20, to_stmt(Command::Overwrite(43))),
+                (30, to_stmt(Command::RandomDelete)),
+                (39, to_stmt(Command::Delete(10, 20))),
+                (1, to_stmt(Command::DeleteRange(99, 100))),
+            ],
+        );
 
         let w = Workload {
             seed: None,
@@ -528,27 +573,27 @@ Unordered[100] {
 }
 "#;
 
-        let expected1 = Section {
-            iter: 100,
-            inner: SectionInner::Ordered(vec![
-                (10, Command::RandomGet),
-                (20, Command::Overwrite(43)),
-                (30, Command::RandomDelete),
-                (39, Command::Delete(10, 20)),
-                (1, Command::DeleteRange(99, 100)),
-            ]),
-        };
+        let expected1 = Section::Ordered(
+            100,
+            vec![
+                (10, to_stmt(Command::RandomGet)),
+                (20, to_stmt(Command::Overwrite(43))),
+                (30, to_stmt(Command::RandomDelete)),
+                (39, to_stmt(Command::Delete(10, 20))),
+                (1, to_stmt(Command::DeleteRange(99, 100))),
+            ],
+        );
 
-        let expected2 = Section {
-            iter: 100,
-            inner: SectionInner::Unordered(vec![
-                (10, Command::RandomGet),
-                (20, Command::Overwrite(43)),
-                (30, Command::RandomDelete),
-                (39, Command::Delete(10, 20)),
-                (1, Command::DeleteRange(99, 100)),
-            ]),
-        };
+        let expected2 = Section::Unordered(
+            100,
+            vec![
+                (10, to_stmt(Command::RandomGet)),
+                (20, to_stmt(Command::Overwrite(43))),
+                (30, to_stmt(Command::RandomDelete)),
+                (39, to_stmt(Command::Delete(10, 20))),
+                (1, to_stmt(Command::DeleteRange(99, 100))),
+            ],
+        );
 
         let w = Workload {
             seed: Some(42),
@@ -621,18 +666,68 @@ Ordered[100] {
   <1%> DeleteRange(99, 100);
 }
 "#;
-        let expected = Section {
-            iter: 100,
-            inner: SectionInner::Ordered(vec![
-                (10, Command::RandomGet),
-                (20, Command::NewPut(43)),
-                (30, Command::RandomDelete),
-                (39, Command::Delete(10, 20)),
-                (1, Command::DeleteRange(99, 100)),
-            ]),
-        };
+        let expected = Section::Ordered(
+            100,
+            vec![
+                (10, to_stmt(Command::RandomGet)),
+                (20, to_stmt(Command::NewPut(43))),
+                (30, to_stmt(Command::RandomDelete)),
+                (39, to_stmt(Command::Delete(10, 20))),
+                (1, to_stmt(Command::DeleteRange(99, 100))),
+            ],
+        );
 
         let r = parse_section().easy_parse(syntax);
+
+        assert_eq!(r, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_times_works() {
+        let syntax = r#"
+10.times {
+  New(1M);
+}
+"#;
+
+        let expected = Command::Times(10, vec![Command::NewPut(1024 * 1024)]);
+        let r = parse_times().easy_parse(syntax);
+
+        assert_eq!(r, Ok((expected, "")));
+    }
+
+    #[test]
+    fn parse_top_command_works() {
+        let syntax = r#"
+Command {
+  New(1M);
+  10.times {
+    New(5K);
+    Get;
+  };
+  Delete;
+  2.times {
+    8.times {
+      New(5M);
+    };
+    Delete;
+  };
+}
+"#;
+
+        let expected = Section::Commands(vec![
+            Command::NewPut(1024 * 1024),
+            Command::Times(10, vec![Command::NewPut(5 * 1024), Command::RandomGet]),
+            Command::RandomDelete,
+            Command::Times(
+                2,
+                vec![
+                    Command::Times(8, vec![Command::NewPut(5 * 1024 * 1024)]),
+                    Command::RandomDelete,
+                ],
+            ),
+        ]);
+        let r = parse_top_command().easy_parse(syntax);
 
         assert_eq!(r, Ok((expected, "")));
     }
