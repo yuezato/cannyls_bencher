@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate combine;
+
 extern crate cannyls;
 extern crate rand;
 pub use cannyls::lump::LumpId;
@@ -26,21 +29,19 @@ pub enum Command {
 
     // DeleteRange
     DeleteRange(Perc, Perc),
+
+    // Times
+    Times(usize, Vec<Command>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Statement(Vec<Command>);
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Section {
-    pub inner: SectionInner,
-    pub iter: usize,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum SectionInner {
-    Ordered(Vec<(Freq, Statement)>),
-    Unordered(Vec<(Freq, Statement)>),
+pub enum Section {
+    Ordered(usize, Vec<(Freq, Statement)>),
+    Unordered(usize, Vec<(Freq, Statement)>),
+    Commands(Vec<Command>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
