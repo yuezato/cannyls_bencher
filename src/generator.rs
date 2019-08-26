@@ -139,7 +139,7 @@ fn delete_range(state: &mut State, left: u8, right: u8) {
     state
         .commands
         .push(RealCommand::DeleteRange(lumpid1, lumpid2));
-    state.live_ids.drain(x..=y);
+    state.live_ids.drain(x..y);
 }
 
 // 0     1     2        99     100%
