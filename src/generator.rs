@@ -2,12 +2,15 @@ use super::{Bytes, RealCommand, Workload};
 use crate::rand::SeedableRng;
 use crate::{Command, Section, Statement};
 use cannyls::lump::LumpId;
+use std::cmp::max;
 
 pub struct State {
     rng: rand::rngs::StdRng,
     next: LumpId,
     live_ids: Vec<(LumpId, Bytes)>,
     pub commands: Vec<RealCommand>,
+    peek_bytes: usize,
+    current_bytes: usize,
 }
 
 impl State {
@@ -17,15 +20,17 @@ impl State {
             next: LumpId::new(1),
             live_ids: Vec::new(),
             commands: Vec::new(),
+            peek_bytes: 0,
+            current_bytes: 0,
         }
     }
 }
 
-pub fn workload_to_real_commands(workload: &Workload) -> Vec<RealCommand> {
+pub fn workload_to_real_commands(workload: &Workload) -> (Vec<RealCommand>, usize) {
     let mut state = State::new(workload.seed);
     let commands = deal_workload(&mut state, workload);
     commands_to_real_commands(&mut state, commands);
-    state.commands
+    (state.commands, state.peek_bytes)
 }
 
 pub fn commands_to_real_commands(state: &mut State, commands: Vec<Command>) {
@@ -46,15 +51,6 @@ pub fn commands_to_real_commands(state: &mut State, commands: Vec<Command>) {
                 commands_to_real_commands(state, commands)
             }
         }
-    }
-}
-
-pub fn default_state() -> State {
-    State {
-        rng: rand::rngs::StdRng::seed_from_u64(0),
-        next: LumpId::new(0),
-        live_ids: Vec::new(),
-        commands: Vec::new(),
     }
 }
 
@@ -108,6 +104,8 @@ fn put(state: &mut State, bytes: Bytes) {
     let lumpid: LumpId = LumpId::new(lumpid);
     state.live_ids.push((lumpid, bytes));
     state.commands.push(RealCommand::Put(lumpid, bytes));
+    state.current_bytes += bytes;
+    state.peek_bytes = max(state.peek_bytes, state.current_bytes);
 }
 
 fn overwrite(state: &mut State, bytes: Bytes) {
@@ -118,6 +116,9 @@ fn overwrite(state: &mut State, bytes: Bytes) {
     let lumpid = state.live_ids[z].0;
     state.live_ids[z].1 = bytes;
     state.commands.push(RealCommand::Put(lumpid, bytes));
+    state.current_bytes -= state.live_ids[z].1;
+    state.current_bytes += bytes;
+    state.peek_bytes = max(state.peek_bytes, state.current_bytes);
 }
 
 fn get(state: &mut State, left: u8, right: u8) {
@@ -135,6 +136,7 @@ fn delete(state: &mut State, left: u8, right: u8) {
     }
     let z = calc_index(&mut state.rng, state.live_ids.len(), left, right);
     let lumpid = state.live_ids[z].0;
+    state.current_bytes -= state.live_ids[z].1;
     state.commands.push(RealCommand::Delete(lumpid));
     state.live_ids.remove(z);
 }
@@ -151,7 +153,9 @@ fn delete_range(state: &mut State, left: u8, right: u8) {
     state
         .commands
         .push(RealCommand::DeleteRange(lumpid1, lumpid2));
-    state.live_ids.drain(x..y);
+    for (_id, bytes) in state.live_ids.drain(x..y) {
+        state.current_bytes -= bytes;
+    }
 }
 
 // 0     1     2        99     100%
