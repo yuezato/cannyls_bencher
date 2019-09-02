@@ -13,14 +13,14 @@ use chrono::Local;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Clone)]
 #[structopt(name = "cannyls_bencher🦀")]
 struct Opt {
     #[structopt(long)]
     workload: PathBuf,
 
     #[structopt(long, parse(try_from_str = "parse_with_suffix"))]
-    capacity: u64,
+    capacity: Option<u64>,
 
     #[structopt(long)]
     lusfname: PathBuf,
@@ -63,8 +63,8 @@ fn file_to_workload<P: AsRef<std::path::Path>>(filepath: P) -> Workload {
 
 fn main() {
     let opt = Opt::from_args();
-    let capacity = opt.capacity;
     let lusfname = opt.lusfname.clone();
+    let capacity = opt.capacity;
     let safe_release_mode = opt.safe_release;
     let verify_mode = opt.verify_mode;
     println!("{:#?}", opt);
@@ -78,8 +78,19 @@ fn main() {
     println!("Start Generating Commands @ {}", Local::now());
     let commands = generator::workload_to_real_commands(&w);
     println!("Finish Generating Commands @ {}", Local::now());
+    println!("Least Required Bytes = {}", least_required);
 
-    let mut storage = run_commands::make_storage_on_file(lusfname, capacity, safe_release_mode);
+    let mut storage = if let Some(capacity) = capacity {
+        run_commands::make_storage_on_file(lusfname, capacity, safe_release_mode)
+    } else {
+        let mbyte = 1024 * 1024;
+        let least_required = ((least_required + (mbyte - 1)) / mbyte) * mbyte;
+        run_commands::make_storage_on_file(
+            lusfname,
+            (1.5 * least_required as f64) as u64,
+            safe_release_mode,
+        )
+    };
 
     if verify_mode {
         println!("Start Verifying @ {}", Local::now());
