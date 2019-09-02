@@ -134,8 +134,8 @@ fn delete(state: &mut State, left: u8, right: u8) {
         return;
     }
     let z = calc_index(&mut state.rng, state.live_ids.len(), left, right);
-    let lumpid = state.live_ids[z].0;
-    state.commands.push(RealCommand::Delete(lumpid));
+    let (lumpid, bytes) = state.live_ids[z];
+    state.commands.push(RealCommand::Delete(lumpid, bytes));
     state.live_ids.remove(z);
 }
 

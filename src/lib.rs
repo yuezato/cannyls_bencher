@@ -60,7 +60,7 @@ pub enum RealCommand {
     Get(LumpId, Bytes),
 
     // Delete
-    Delete(LumpId),
+    Delete(LumpId, Bytes),
 
     // DeleteRange
     DeleteRange(LumpId, LumpId),

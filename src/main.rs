@@ -62,15 +62,6 @@ fn file_to_workload<P: AsRef<std::path::Path>>(filepath: P) -> Workload {
 }
 
 fn main() {
-    let addr = "0.0.0.0:5555".parse().unwrap();
-    let mut builder = ServerBuilder::new(addr);
-    builder
-        .add_handler(WithMetrics::new(MetricsHandler))
-        .unwrap();
-
-    let server = builder.finish(fibers_global::handle());
-    fibers_global::spawn(server.map_err(|e| panic!("Metrics Server Error: {:?}", e)));
-
     let opt = Opt::from_args();
     let capacity = opt.capacity;
     let lusfname = opt.lusfname.clone();
@@ -84,29 +75,36 @@ fn main() {
         println!("{:?}", w);
     }
 
+    println!("Start Generating Commands @ {}", Local::now());
+    let commands = generator::workload_to_real_commands(&w);
+    println!("Finish Generating Commands @ {}", Local::now());
+
+    let mut storage = run_commands::make_storage_on_file(lusfname, capacity, safe_release_mode);
+
+    if verify_mode {
+        println!("Start Verifying @ {}", Local::now());
+        verifier::verify_commands(&mut storage, &commands);
+        println!("Finish Verifying @ {}", Local::now());
+        return;
+    }
+
+    // ベンチモードではCannylsのメトリクスを取れるようにする
+    let addr = "0.0.0.0:5555".parse().unwrap();
+    let mut builder = ServerBuilder::new(addr);
+    builder
+        .add_handler(WithMetrics::new(MetricsHandler))
+        .unwrap();
+
+    let server = builder.finish(fibers_global::handle());
+    fibers_global::spawn(server.map_err(|e| panic!("Metrics Server Error: {:?}", e)));
     fibers_global::execute(
         lazy(move || {
-            println!("Start Generating Commands @ {}", Local::now());
-            let commands = generator::workload_to_real_commands(&w);
-            println!("Finish Generating Commands @ {}", Local::now());
+            println!("Start Benchmark @ {}", Local::now());
+            let mut summary = run_commands::do_commands(&mut storage, &commands);
+            println!("Finish Benchmark @ {}", Local::now());
 
-            let mut storage =
-                run_commands::make_storage_on_file(lusfname, capacity, safe_release_mode);
-
-            if verify_mode {
-                // Verifying
-                println!("Start Verifying @ {}", Local::now());
-                verifier::verify_commands(&mut storage, &commands);
-                println!("Finish Verifying @ {}", Local::now());
-            } else {
-                // Benchmarking
-                println!("Start Benchmark @ {}", Local::now());
-                let mut summary = run_commands::do_commands(&mut storage, &commands);
-                println!("Finish Benchmark @ {}", Local::now());
-
-                println!("Calculating Statistics...");
-                run_commands::statistics(&mut summary);
-            }
+            println!("Calculating Statistics...");
+            run_commands::statistics(&mut summary);
 
             Ok(())
         })
