@@ -30,6 +30,9 @@ struct Opt {
 
     #[structopt(long)]
     safe_release: bool,
+
+    #[structopt(long)]
+    verify_mode: bool,
 }
 
 fn parse_with_suffix(s: &str) -> Result<u64, String> {
@@ -59,19 +62,11 @@ fn file_to_workload<P: AsRef<std::path::Path>>(filepath: P) -> Workload {
 }
 
 fn main() {
-    let addr = "0.0.0.0:5555".parse().unwrap();
-    let mut builder = ServerBuilder::new(addr);
-    builder
-        .add_handler(WithMetrics::new(MetricsHandler))
-        .unwrap();
-
-    let server = builder.finish(fibers_global::handle());
-    fibers_global::spawn(server.map_err(|e| panic!("Metrics Server Error: {:?}", e)));
-
     let opt = Opt::from_args();
     let lusfname = opt.lusfname.clone();
     let capacity = opt.capacity;
     let safe_release_mode = opt.safe_release;
+    let verify_mode = opt.verify_mode;
     println!("{:#?}", opt);
 
     let w = file_to_workload(opt.workload);
@@ -80,25 +75,41 @@ fn main() {
         println!("{:?}", w);
     }
 
+    println!("Start Generating Commands @ {}", Local::now());
+    let (commands, least_required) = generator::workload_to_real_commands(&w);
+    println!("Finish Generating Commands @ {}", Local::now());
+    println!("Least Required Bytes = {}", least_required);
+
+    let mut storage = if let Some(capacity) = capacity {
+        run_commands::make_storage_on_file(lusfname, capacity, safe_release_mode)
+    } else {
+        let mbyte = 1024 * 1024;
+        let least_required = ((least_required + (mbyte - 1)) / mbyte) * mbyte;
+        run_commands::make_storage_on_file(
+            lusfname,
+            (1.5 * least_required as f64) as u64,
+            safe_release_mode,
+        )
+    };
+
+    if verify_mode {
+        println!("Start Verifying @ {}", Local::now());
+        verifier::verify_commands(&mut storage, &commands);
+        println!("Finish Verifying @ {}", Local::now());
+        return;
+    }
+
+    // ベンチモードではCannylsのメトリクスを取れるようにする
+    let addr = "0.0.0.0:5555".parse().unwrap();
+    let mut builder = ServerBuilder::new(addr);
+    builder
+        .add_handler(WithMetrics::new(MetricsHandler))
+        .unwrap();
+
+    let server = builder.finish(fibers_global::handle());
+    fibers_global::spawn(server.map_err(|e| panic!("Metrics Server Error: {:?}", e)));
     fibers_global::execute(
         lazy(move || {
-            println!("Start Generating Commands @ {}", Local::now());
-            let (commands, least_required) = generator::workload_to_real_commands(&w);
-            println!("Finish Generating Commands @ {}", Local::now());
-            println!("Least Required Bytes = {}", least_required);
-
-            let mut storage = if let Some(capacity) = capacity {
-                run_commands::make_storage_on_file(lusfname, capacity, safe_release_mode)
-            } else {
-                let mbyte = 1024 * 1024;
-                let least_required = ((least_required + (mbyte - 1)) / mbyte) * mbyte;
-                run_commands::make_storage_on_file(
-                    lusfname,
-                    (1.5 * least_required as f64) as u64,
-                    safe_release_mode,
-                )
-            };
-
             println!("Start Benchmark @ {}", Local::now());
             let mut summary = run_commands::do_commands(&mut storage, &commands);
             println!("Finish Benchmark @ {}", Local::now());

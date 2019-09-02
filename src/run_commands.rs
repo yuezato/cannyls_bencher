@@ -145,7 +145,7 @@ where
                     .insert(CommandKind::Get(*bytes), vec![elapsed]);
             }
         }
-        RealCommand::Delete(lumpid) => {
+        RealCommand::Delete(lumpid, _) => {
             let now = Instant::now();
             let existed = storage.delete(&lumpid).unwrap();
             let elapsed = now.elapsed();

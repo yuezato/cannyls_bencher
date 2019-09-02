@@ -8,6 +8,7 @@ pub use cannyls::lump::LumpId;
 pub mod generator;
 pub mod parse;
 pub mod run_commands;
+pub mod verifier;
 
 pub type Bytes = usize;
 pub type Perc = u8;
@@ -59,7 +60,7 @@ pub enum RealCommand {
     Get(LumpId, Bytes),
 
     // Delete
-    Delete(LumpId),
+    Delete(LumpId, Bytes),
 
     // DeleteRange
     DeleteRange(LumpId, LumpId),
