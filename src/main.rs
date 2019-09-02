@@ -76,7 +76,7 @@ fn main() {
     }
 
     println!("Start Generating Commands @ {}", Local::now());
-    let commands = generator::workload_to_real_commands(&w);
+    let (commands, least_required) = generator::workload_to_real_commands(&w);
     println!("Finish Generating Commands @ {}", Local::now());
     println!("Least Required Bytes = {}", least_required);
 
