@@ -30,6 +30,9 @@ struct Opt {
 
     #[structopt(long)]
     safe_release: bool,
+
+    #[structopt(long)]
+    verify_mode: bool,
 }
 
 fn parse_with_suffix(s: &str) -> Result<u64, String> {
@@ -72,6 +75,7 @@ fn main() {
     let capacity = opt.capacity;
     let lusfname = opt.lusfname.clone();
     let safe_release_mode = opt.safe_release;
+    let verify_mode = opt.verify_mode;
     println!("{:#?}", opt);
 
     let w = file_to_workload(opt.workload);
@@ -89,12 +93,20 @@ fn main() {
             let mut storage =
                 run_commands::make_storage_on_file(lusfname, capacity, safe_release_mode);
 
-            println!("Start Benchmark @ {}", Local::now());
-            let mut summary = run_commands::do_commands(&mut storage, &commands);
-            println!("Finish Benchmark @ {}", Local::now());
+            if verify_mode {
+                // Verifying
+                println!("Start Verifying @ {}", Local::now());
+                verifier::verify_commands(&mut storage, &commands);
+                println!("Finish Verifying @ {}", Local::now());
+            } else {
+                // Benchmarking
+                println!("Start Benchmark @ {}", Local::now());
+                let mut summary = run_commands::do_commands(&mut storage, &commands);
+                println!("Finish Benchmark @ {}", Local::now());
 
-            println!("Calculating Statistics...");
-            run_commands::statistics(&mut summary);
+                println!("Calculating Statistics...");
+                run_commands::statistics(&mut summary);
+            }
 
             Ok(())
         })
