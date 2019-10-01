@@ -171,6 +171,7 @@ where
 {
     newput()
         .or(overwrite())
+        .or(embed())
         .or(attempt(get_with_perc()))
         .or(random_get())
         .or(attempt(delete_with_perc()))
@@ -244,6 +245,15 @@ where
 {
     (string("OverWrite"), token('('), parse_bytes(), token(')'))
         .map(|(_, _, num, _)| Command::Overwrite(num))
+}
+
+fn embed<I>() -> impl Parser<Input = I, Output = Command>
+where
+    I: Stream<Item = char>,
+    I::Error: ParseError<I::Item, I::Range, I::Position>,
+{
+    (string("Embed"), token('('), parse_bytes(), token(')'))
+        .map(|(_, _, num, _)| Command::Embed(num))
 }
 
 fn random_get<I>() -> impl Parser<Input = I, Output = Command>
@@ -324,6 +334,19 @@ mod tests {
         assert_eq!(
             newput().parse("New(12M)"),
             Ok((Command::NewPut(12 * 1024 * 1024), ""))
+        );
+    }
+
+    #[test]
+    fn embed_works() {
+        assert_eq!(embed().parse("Embed(12)"), Ok((Command::Embed(12), "")));
+        assert_eq!(
+            embed().parse("Embed(12K)"),
+            Ok((Command::Embed(12 * 1024), ""))
+        );
+        assert_eq!(
+            embed().parse("Embed(12M)"),
+            Ok((Command::Embed(12 * 1024 * 1024), ""))
         );
     }
 

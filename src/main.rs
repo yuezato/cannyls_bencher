@@ -29,9 +29,6 @@ struct Opt {
     verbose: bool,
 
     #[structopt(long)]
-    safe_release: bool,
-
-    #[structopt(long)]
     verify_mode: bool,
 }
 
@@ -65,7 +62,6 @@ fn main() {
     let opt = Opt::from_args();
     let lusfname = opt.lusfname.clone();
     let capacity = opt.capacity;
-    let safe_release_mode = opt.safe_release;
     let verify_mode = opt.verify_mode;
     println!("{:#?}", opt);
 
@@ -81,15 +77,11 @@ fn main() {
     println!("Least Required Bytes = {}", least_required);
 
     let mut storage = if let Some(capacity) = capacity {
-        run_commands::make_storage_on_file(lusfname, capacity, safe_release_mode)
+        run_commands::make_storage_on_file(lusfname, capacity)
     } else {
         let mbyte = 1024 * 1024;
         let least_required = ((least_required + (mbyte - 1)) / mbyte) * mbyte;
-        run_commands::make_storage_on_file(
-            lusfname,
-            (1.5 * least_required as f64) as u64,
-            safe_release_mode,
-        )
+        run_commands::make_storage_on_file(lusfname, (1.5 * least_required as f64) as u64)
     };
 
     if verify_mode {

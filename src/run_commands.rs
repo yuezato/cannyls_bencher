@@ -10,6 +10,8 @@ use std::time::{Duration, Instant};
 enum CommandKind {
     Put(Bytes),
 
+    Embed(Bytes),
+
     Get(Bytes),
 
     Delete,
@@ -117,6 +119,24 @@ where
                 }
             }
         }
+        RealCommand::Embed(lumpid, bytes) => {
+            let lump = lump::LumpData::new_embedded(vec![0; *bytes]).unwrap();
+            {
+                let now = Instant::now();
+                let _ = storage.put(&lumpid, &lump).unwrap();
+                let elapsed = now.elapsed();
+
+                summary.total_time += elapsed;
+
+                if let Some(v) = summary.result.get_mut(&CommandKind::Embed(*bytes)) {
+                    v.push(elapsed);
+                } else {
+                    summary
+                        .result
+                        .insert(CommandKind::Embed(*bytes), vec![elapsed]);
+                }
+            }
+        }
         RealCommand::Get(lumpid, bytes) => {
             let now = Instant::now();
             let lump = storage.get(&lumpid).unwrap();
@@ -185,18 +205,11 @@ where
     }
 }
 
-pub fn make_storage_on_file<P>(
-    filepath: P,
-    capacity: u64,
-    safe_release_mode: bool,
-) -> Storage<FileNvm>
+pub fn make_storage_on_file<P>(filepath: P, capacity: u64) -> Storage<FileNvm>
 where
     P: AsRef<std::path::Path>,
 {
     let filenvm = FileNvm::create(filepath, capacity).unwrap();
-    let mut builder = StorageBuilder::new();
-    if safe_release_mode {
-        builder.enable_safe_release_mode();
-    }
+    let builder = StorageBuilder::new();
     builder.create(filenvm).unwrap()
 }

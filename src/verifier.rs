@@ -43,6 +43,11 @@ where
             let lump = storage.allocate_lump_data_with_bytes(&v).unwrap();
             let _ = storage.put(&lumpid, &lump).unwrap();
         }
+        RealCommand::Embed(lumpid, bytes) => {
+            let v = lumpid_to_bytes(*lumpid, *bytes);
+            let lump = lump::LumpData::new_embedded(v).unwrap();
+            let _ = storage.put(&lumpid, &lump).unwrap();
+        }
         RealCommand::Get(lumpid, bytes) => {
             let v = lumpid_to_bytes(*lumpid, *bytes);
             let lump = storage.get(&lumpid).unwrap();
