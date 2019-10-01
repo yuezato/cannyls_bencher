@@ -8,12 +8,9 @@ edition = "2018"
 
 [dependencies]
 combine = "3.8"
-cannyls = "0.9"
+# cannyls = "0.9"
 chrono = "0.4"
-<<<<<<< HEAD
 cannyls = { git = "https://github.com/yuezato/cannyls", branch = "patch_for_issue27" }
-=======
->>>>>>> master
 rand = "*"
 structopt = "*"
 fibers_global = "*"
