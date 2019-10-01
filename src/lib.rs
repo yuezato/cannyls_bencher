@@ -20,6 +20,9 @@ pub enum Command {
     NewPut(Bytes),
     Overwrite(Bytes),
 
+    // Embedding Put
+    Embed(Bytes),
+
     // Get
     RandomGet,
     Get(Perc, Perc),
@@ -55,6 +58,9 @@ pub struct Workload {
 pub enum RealCommand {
     // Put
     Put(LumpId, Bytes),
+
+    // Embedding Put
+    Embed(LumpId, Bytes),
 
     // Get
     Get(LumpId, Bytes),

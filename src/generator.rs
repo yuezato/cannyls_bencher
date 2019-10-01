@@ -38,6 +38,7 @@ pub fn commands_to_real_commands(state: &mut State, commands: Vec<Command>) {
         match command {
             Command::NewPut(bytes) => put(state, bytes),
             Command::Overwrite(bytes) => overwrite(state, bytes),
+            Command::Embed(bytes) => embed(state, bytes),
             Command::RandomGet => get(state, 0, 100),
             Command::Get(left, right) => get(state, left, right),
             Command::RandomDelete => delete(state, 0, 100),
@@ -104,6 +105,16 @@ fn put(state: &mut State, bytes: Bytes) {
     let lumpid: LumpId = LumpId::new(lumpid);
     state.live_ids.push((lumpid, bytes));
     state.commands.push(RealCommand::Put(lumpid, bytes));
+    state.current_bytes += bytes;
+    state.peek_bytes = max(state.peek_bytes, state.current_bytes);
+}
+
+fn embed(state: &mut State, bytes: Bytes) {
+    let lumpid = state.next.as_u128();
+    state.next = LumpId::new(lumpid + 1);
+    let lumpid: LumpId = LumpId::new(lumpid);
+    state.live_ids.push((lumpid, bytes));
+    state.commands.push(RealCommand::Embed(lumpid, bytes));
     state.current_bytes += bytes;
     state.peek_bytes = max(state.peek_bytes, state.current_bytes);
 }

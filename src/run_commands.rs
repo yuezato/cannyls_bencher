@@ -10,6 +10,8 @@ use std::time::{Duration, Instant};
 enum CommandKind {
     Put(Bytes),
 
+    Embed(Bytes),
+
     Get(Bytes),
 
     Delete,
@@ -117,6 +119,24 @@ where
                 }
             }
         }
+        RealCommand::Embed(lumpid, bytes) => {
+            let lump = lump::LumpData::new_embedded(vec![0; *bytes]).unwrap();
+            {
+                let now = Instant::now();
+                let _ = storage.put(&lumpid, &lump).unwrap();
+                let elapsed = now.elapsed();
+
+                summary.total_time += elapsed;
+
+                if let Some(v) = summary.result.get_mut(&CommandKind::Embed(*bytes)) {
+                    v.push(elapsed);
+                } else {
+                    summary
+                        .result
+                        .insert(CommandKind::Embed(*bytes), vec![elapsed]);
+                }
+            }
+        }
         RealCommand::Get(lumpid, bytes) => {
             let now = Instant::now();
             let lump = storage.get(&lumpid).unwrap();
@@ -185,15 +205,23 @@ where
     }
 }
 
+<<<<<<< HEAD
 pub fn make_storage_on_file<P>(filepath: P, capacity: u64, safe_write_mode: bool) -> Storage<FileNvm>
+=======
+pub fn make_storage_on_file<P>(filepath: P, capacity: u64) -> Storage<FileNvm>
+>>>>>>> master
 where
     P: AsRef<std::path::Path>,
 {
     let filenvm = FileNvm::create(filepath, capacity).unwrap();
+<<<<<<< HEAD
     let mut builder = StorageBuilder::new();
     if safe_write_mode {
         builder.journal_safe_flush(true);
         builder.journal_safe_enqueue(true);
     }
+=======
+    let builder = StorageBuilder::new();
+>>>>>>> master
     builder.create(filenvm).unwrap()
 }
