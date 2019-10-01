@@ -68,7 +68,7 @@ dependencies = [
 [[package]]
 name = "cannyls"
 version = "0.9.3"
-source = "git+https://github.com/yuezato/cannyls?branch=patch_for_issue27#bd5c83ff851097e72a9607a37eeebab729305c1a"
+source = "git+https://github.com/yuezato/cannyls?branch=patch_for_issue27#83556e3c4a54f476da944e8d805180a9bfa4e779"
 dependencies = [
  "adler32 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -185,14 +185,15 @@ where
     }
 }
 
-pub fn make_storage_on_file<P>(filepath: P, capacity: u64, safe_sync_mode: bool) -> Storage<FileNvm>
+pub fn make_storage_on_file<P>(filepath: P, capacity: u64, safe_write_mode: bool) -> Storage<FileNvm>
 where
     P: AsRef<std::path::Path>,
 {
     let filenvm = FileNvm::create(filepath, capacity).unwrap();
     let mut builder = StorageBuilder::new();
-    if safe_sync_mode {
-        builder.journal_safe_sync(true);
+    if safe_write_mode {
+        builder.journal_safe_flush(true);
+        builder.journal_safe_enqueue(true);
     }
     builder.create(filenvm).unwrap()
 }
