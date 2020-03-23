@@ -30,6 +30,9 @@ struct Opt {
 
     #[structopt(long)]
     verify_mode: bool,
+
+    #[structopt(long)]
+    huge_pool: bool,
 }
 
 fn parse_with_suffix(s: &str) -> Result<u64, String> {
@@ -63,6 +66,7 @@ fn main() {
     let lusfname = opt.lusfname.clone();
     let capacity = opt.capacity;
     let verify_mode = opt.verify_mode;
+    let huge_pool = opt.huge_pool;
     println!("{:#?}", opt);
 
     let w = file_to_workload(opt.workload);
@@ -77,11 +81,15 @@ fn main() {
     println!("Least Required Bytes = {}", least_required);
 
     let mut storage = if let Some(capacity) = capacity {
-        run_commands::make_storage_on_file(lusfname, capacity)
+        run_commands::make_storage_on_file(lusfname, capacity, huge_pool)
     } else {
         let mbyte = 1024 * 1024;
         let least_required = ((least_required + (mbyte - 1)) / mbyte) * mbyte;
-        run_commands::make_storage_on_file(lusfname, (1.5 * least_required as f64) as u64)
+        run_commands::make_storage_on_file(
+            lusfname,
+            (1.5 * least_required as f64) as u64,
+            huge_pool,
+        )
     };
 
     if verify_mode {

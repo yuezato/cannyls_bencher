@@ -205,11 +205,11 @@ where
     }
 }
 
-pub fn make_storage_on_file<P>(filepath: P, capacity: u64) -> Storage<FileNvm>
+pub fn make_storage_on_file<P>(filepath: P, capacity: u64, huge_pool: bool) -> Storage<FileNvm>
 where
     P: AsRef<std::path::Path>,
 {
     let filenvm = FileNvm::create(filepath, capacity).unwrap();
-    let builder = StorageBuilder::new();
-    builder.create(filenvm).unwrap()
+    let mut builder = StorageBuilder::new();
+    builder.hugepool_on_data(huge_pool).create(filenvm).unwrap()
 }
