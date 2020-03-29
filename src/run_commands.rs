@@ -205,11 +205,21 @@ where
     }
 }
 
-pub fn make_storage_on_file<P>(filepath: P, capacity: u64, huge_pool: bool) -> Storage<FileNvm>
+pub fn make_storage_on_file<P>(filepath: P, capacity: u64, block_size: Option<u16>, huge_pool: bool) -> Storage<FileNvm>
 where
     P: AsRef<std::path::Path>,
 {
-    let filenvm = FileNvm::create(filepath, capacity).unwrap();
+    use cannyls::block::BlockSize;
+    
+    let (filenvm, created) = FileNvm::create_if_absent(filepath, capacity).unwrap();
+
+    if created {
+        println!("[Notice:] we CREATE a new file by the given name");
+    } else {
+        println!("[Notice:] we OPEN the file");
+    }
+    
     let mut builder = StorageBuilder::new();
-    builder.hugepool_on_data(huge_pool).create(filenvm).unwrap()
+    let blocksize = BlockSize::new(block_size.unwrap_or(512)).expect("failed");
+    builder.block_size(blocksize).hugepool_on_data(huge_pool).create(filenvm).unwrap()
 }
