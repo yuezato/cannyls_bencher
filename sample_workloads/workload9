@@ -1,0 +1,7 @@
+# HugePool用のテストその1
+
+Command {
+  5000.times {
+    New(2M);
+  };
+}
